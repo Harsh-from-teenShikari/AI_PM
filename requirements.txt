@@ -1,3 +1,5 @@
 streamlit
 openai
 pillow
+requests
+beautifulsoup4
