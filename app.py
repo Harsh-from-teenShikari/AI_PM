@@ -19,11 +19,13 @@ with col1:
 with col2:
     landing_url = st.text_input("2. Target Landing Page URL", placeholder="https://troopod.io")
 
-# Helper function to convert the uploaded image to base64 for NVIDIA
+# Helper function to safely convert the uploaded image to base64 for NVIDIA
 def encode_image_to_base64(uploaded_file):
     image = Image.open(uploaded_file)
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
+    # Convert to RGB to prevent errors if the user uploads a transparent PNG
+    if image.mode in ("RGBA", "P"):
+        image = image.convert("RGB")
+    
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
@@ -51,7 +53,7 @@ if st.button("Generate Personalized Page"):
                 Analyze the ad's main message, tone, and offer. Then, imagine the landing page for that URL.
                 Provide exactly 3 text mutations (changes) to make the landing page match the ad better.
                 
-                Respond ONLY with a raw JSON object using this exact format without any markdown formatting:
+                Respond ONLY with a raw JSON object. Do not include markdown formatting like ```json. Use this exact format:
                 {{
                     "mutations": [
                         {{"selector": "h1.hero-title", "original_text": "...", "new_text": "...", "cro_reason": "..."}}
@@ -79,7 +81,7 @@ if st.button("Generate Personalized Page"):
                     temperature=0.2 # Low temperature for more reliable JSON
                 )
                 
-                # 5. Robust JSON Extraction
+                # 5. Robust JSON Extraction (Catches errors if AI adds extra text)
                 raw_response = response.choices[0].message.content
                 
                 # Use regex to find everything between the first { and the last }
@@ -92,6 +94,10 @@ if st.button("Generate Personalized Page"):
                     st.success("Analysis Complete! Here are the dynamic, NVIDIA AI-generated results:")
                     st.json(result_dict)
                 else:
-                    # If it completely failed to make JSON, show what it actually said so we can debug it
-                    st.error("The AI failed to format the output correctly. Here is its raw response:")
+                    st.error("The AI failed to format the output as JSON. Here is its raw response:")
                     st.write(raw_response)
+                
+            except Exception as e:
+                st.error(f"API Error: {e}")
+    else:
+        st.error("Please provide an ad creative, a URL, and an API key.")
