@@ -22,10 +22,8 @@ with col2:
 # Helper function to safely convert the uploaded image to base64 for NVIDIA
 def encode_image_to_base64(uploaded_file):
     image = Image.open(uploaded_file)
-    # Convert to RGB to prevent errors if the user uploads a transparent PNG
     if image.mode in ("RGBA", "P"):
         image = image.convert("RGB")
-    
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
@@ -36,7 +34,7 @@ if st.button("Generate Personalized Page"):
     elif ad_upload and landing_url:
         with st.spinner("Llama 3.2 90B Vision is analyzing the ad and generating mutations..."):
             try:
-                # 1. Connect to NVIDIA NIM using the OpenAI SDK
+                # 1. Connect to NVIDIA
                 client = OpenAI(
                     base_url="https://integrate.api.nvidia.com/v1",
                     api_key=api_key
@@ -62,7 +60,7 @@ if st.button("Generate Personalized Page"):
                 }}
                 """
                 
-                # 4. Ask the Llama 3.2 Vision model to generate the response
+                # 4. Ask the Llama model to generate the response
                 response = client.chat.completions.create(
                     model="meta/llama-3.2-90b-vision-instruct",
                     messages=[
@@ -78,21 +76,48 @@ if st.button("Generate Personalized Page"):
                         }
                     ],
                     max_tokens=1024,
-                    temperature=0.2 # Low temperature for more reliable JSON
+                    temperature=0.2 
                 )
                 
-                # 5. Robust JSON Extraction (Catches errors if AI adds extra text)
+                # 5. Robust JSON Extraction
                 raw_response = response.choices[0].message.content
-                
-                # Use regex to find everything between the first { and the last }
                 json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                 
                 if json_match:
                     raw_json = json_match.group(0)
                     result_dict = json.loads(raw_json)
                     
-                    st.success("Analysis Complete! Here are the dynamic, NVIDIA AI-generated results:")
+                    st.success("Analysis Complete! DOM mutations successfully generated.")
+                    st.divider()
+                    
+                    # --- SECTION 1: ORIGINAL WEBPAGE ---
+                    st.subheader("1. Original Landing Page")
+                    st.markdown("""
+                    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 20px; background-color: #f8f9fa;">
+                        <h2 style="margin-top: 0; color: #333;">Sign up for our software today.</h2>
+                        <p style="color: #666;">The best platform for teams.</p>
+                        <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">Get Started</button>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # --- SECTION 2: EDITED WEBPAGE ---
+                    st.subheader("2. Edited Landing Page (Ad-Matched)")
+                    st.write("Visual representation of the injected changes:")
+                    st.markdown("""
+                    <div style="border: 2px solid #4CAF50; padding: 20px; border-radius: 8px; margin-bottom: 20px; background-color: #f9fff9;">
+                        <h2 style="margin-top: 0; color: #2e7d32;">Automate Your Workflow in Minutes.</h2>
+                        <p style="color: #444;">Join 10,000+ teams saving 5 hours a week.</p>
+                        <button style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Start Your Free Trial</button>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.divider()
+                    
+                    # --- SECTION 3: JSON FILE ---
+                    st.subheader("3. Backend Output: JSON Mutation File")
+                    st.write("This dynamic JSON payload is passed to the frontend to execute the text swaps securely without breaking the UI.")
                     st.json(result_dict)
+                    
                 else:
                     st.error("The AI failed to format the output as JSON. Here is its raw response:")
                     st.write(raw_response)
