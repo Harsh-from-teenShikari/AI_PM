@@ -26,7 +26,7 @@ if st.button("Generate Personalized Page"):
                 genai.configure(api_key=api_key)
                 
                 # UPDATED: Using the most stable Flash model
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-2.0-flash')
                 
                 # 2. Prepare the Image
                 img = Image.open(ad_upload)
