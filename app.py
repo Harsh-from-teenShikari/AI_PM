@@ -4,6 +4,7 @@ import base64
 from PIL import Image
 import io
 import json
+import re
 
 st.set_page_config(page_title="Troopod AI CRO Engine", layout="wide")
 
@@ -78,15 +79,19 @@ if st.button("Generate Personalized Page"):
                     temperature=0.2 # Low temperature for more reliable JSON
                 )
                 
-                # 5. Clean up the output to display nicely
+                # 5. Robust JSON Extraction
                 raw_response = response.choices[0].message.content
-                raw_json = raw_response.replace('```json', '').replace('```', '').strip()
-                result_dict = json.loads(raw_json)
                 
-                st.success("Analysis Complete! Here are the dynamic, NVIDIA AI-generated results:")
-                st.json(result_dict)
+                # Use regex to find everything between the first { and the last }
+                json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                 
-            except Exception as e:
-                st.error(f"API Error: {e}")
-    else:
-        st.error("Please provide an ad creative, a URL, and an API key.")
+                if json_match:
+                    raw_json = json_match.group(0)
+                    result_dict = json.loads(raw_json)
+                    
+                    st.success("Analysis Complete! Here are the dynamic, NVIDIA AI-generated results:")
+                    st.json(result_dict)
+                else:
+                    # If it completely failed to make JSON, show what it actually said so we can debug it
+                    st.error("The AI failed to format the output correctly. Here is its raw response:")
+                    st.write(raw_response)
