@@ -7,7 +7,7 @@ st.set_page_config(page_title="Troopod AI CRO Engine", layout="wide")
 
 st.title("⚡ Troopod: Real AI Landing Page Personalizer")
 
-# Input for API Key (Securely entered by you or the reviewer)
+# Input for API Key
 api_key = st.text_input("Enter Google Gemini API Key (to power the AI):", type="password")
 
 col1, col2 = st.columns(2)
@@ -18,18 +18,20 @@ with col2:
 
 if st.button("Generate Personalized Page"):
     if not api_key:
-        st.error("Please enter an API key first.")
+        st.error("Please enter your API key first.")
     elif ad_upload and landing_url:
-        with st.spinner("AI is analyzing the ad and generating real mutations..."):
+        with st.spinner("Gemini 1.5 Pro is analyzing the ad and generating mutations..."):
             try:
                 # 1. Connect to the AI
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                
+                # UPDATED: Using the more powerful Pro model
+                model = genai.GenerativeModel('gemini-1.5-pro')
                 
                 # 2. Prepare the Image
                 img = Image.open(ad_upload)
                 
-                # 3. Give the AI its instructions (The Prompt)
+                # 3. Give the AI its instructions
                 prompt = f"""
                 You are a Conversion Rate Optimization (CRO) expert. 
                 I am giving you an ad creative image and a target URL: {landing_url}
@@ -57,6 +59,8 @@ if st.button("Generate Personalized Page"):
                 st.json(result_dict)
                 
             except Exception as e:
-                st.error(f"Something went wrong with the AI: {e}")
+                # This will print the exact reason it is not working!
+                st.error(f"API Error: {e}")
+                st.info("Check that your API key is correct and that you have 'google-generativeai' and 'pillow' in your requirements.txt file.")
     else:
         st.error("Please provide an ad creative, a URL, and an API key.")
