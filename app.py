@@ -20,13 +20,13 @@ if st.button("Generate Personalized Page"):
     if not api_key:
         st.error("Please enter your API key first.")
     elif ad_upload and landing_url:
-        with st.spinner("Gemini 1.5 Pro is analyzing the ad and generating mutations..."):
+        with st.spinner("Gemini Flash is analyzing the ad and generating mutations..."):
             try:
                 # 1. Connect to the AI
                 genai.configure(api_key=api_key)
                 
-                # UPDATED: Using the more powerful Pro model
-                model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                # UPDATED: Using the most stable Flash model
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 # 2. Prepare the Image
                 img = Image.open(ad_upload)
@@ -59,8 +59,6 @@ if st.button("Generate Personalized Page"):
                 st.json(result_dict)
                 
             except Exception as e:
-                # This will print the exact reason it is not working!
                 st.error(f"API Error: {e}")
-                st.info("Check that your API key is correct and that you have 'google-generativeai' and 'pillow' in your requirements.txt file.")
     else:
         st.error("Please provide an ad creative, a URL, and an API key.")
