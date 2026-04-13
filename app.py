@@ -1,14 +1,17 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 import base64
 from PIL import Image
 import io
 import json
 import re
+import requests
+from bs4 import BeautifulSoup
 
 st.set_page_config(page_title="Troopod AI CRO Engine", layout="wide")
 
-st.title("⚡ Troopod: Real AI Landing Page Personalizer")
+st.title("⚡ Troopod: Live AI Landing Page Personalizer")
 
 # Input for NVIDIA API Key
 api_key = st.text_input("Enter NVIDIA API Key (starts with 'nvapi-'):", type="password")
@@ -17,9 +20,9 @@ col1, col2 = st.columns(2)
 with col1:
     ad_upload = st.file_uploader("1. Upload Ad Creative (Image)", type=["png", "jpg", "jpeg"])
 with col2:
-    landing_url = st.text_input("2. Target Landing Page URL", placeholder="https://troopod.io")
+    landing_url = st.text_input("2. Target Landing Page URL", placeholder="https://example.com")
 
-# Helper function to safely convert the uploaded image to base64 for NVIDIA
+# Helper function for Image
 def encode_image_to_base64(uploaded_file):
     image = Image.open(uploaded_file)
     if image.mode in ("RGBA", "P"):
@@ -28,39 +31,61 @@ def encode_image_to_base64(uploaded_file):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
+# Helper function to fetch real HTML
+def fetch_real_html(url):
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Inject a <base> tag so images and CSS styles still load correctly
+        if not soup.find('base'):
+            base = soup.new_tag('base', href=url)
+            soup.head.insert(0, base)
+            
+        return soup
+    except Exception as e:
+        return None
+
 if st.button("Generate Personalized Page"):
     if not api_key:
         st.error("Please enter your NVIDIA API key first.")
     elif ad_upload and landing_url:
-        with st.spinner("Llama 3.2 90B Vision is analyzing the ad and generating mutations..."):
-            try:
-                # 1. Connect to NVIDIA
-                client = OpenAI(
-                    base_url="https://integrate.api.nvidia.com/v1",
-                    api_key=api_key
-                )
+        with st.spinner("Fetching live website and analyzing ad creative..."):
+            
+            # --- 1. FETCH LIVE WEBSITE ---
+            live_soup = fetch_real_html(landing_url)
+            if not live_soup:
+                st.error("Could not fetch the live URL. Some websites block scrapers. Try a simpler site like 'https://example.com'")
+                st.stop()
                 
-                # 2. Process the image
+            # Extract the actual text from the site to feed to the AI
+            page_text = live_soup.get_text(separator=' ', strip=True)[:1500] 
+            
+            try:
+                # --- 2. CONNECT TO AI ---
+                client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
                 base64_image = encode_image_to_base64(ad_upload)
                 
-                # 3. Give the AI its instructions
+                # --- 3. PROMPT THE AI WITH REAL DATA ---
                 prompt_text = f"""
                 You are a Conversion Rate Optimization (CRO) expert. 
-                I am giving you an ad creative image and a target URL: {landing_url}
+                Ad target URL: {landing_url}
+                Here is the actual visible text scraped from that landing page: "{page_text}"
                 
-                Analyze the ad's main message, tone, and offer. Then, imagine the landing page for that URL.
-                Provide exactly 3 text mutations (changes) to make the landing page match the ad better.
+                Analyze the uploaded ad image's main message. 
+                Provide exactly 3 text mutations to make the landing page match the ad better.
+                Use basic HTML tags as the 'selector' (e.g., "h1", "p", "button", "a").
                 
-                Respond ONLY with a raw JSON object. Do not include markdown formatting like ```json. Use this exact format:
+                Respond ONLY with a raw JSON object. Do not include markdown formatting:
                 {{
                     "mutations": [
-                        {{"selector": "h1.hero-title", "original_text": "...", "new_text": "...", "cro_reason": "..."}}
-                    ],
-                    "confidence_score": 0.95
+                        {{"selector": "h1", "original_text": "...", "new_text": "...", "cro_reason": "..."}}
+                    ]
                 }}
                 """
                 
-                # 4. Ask the Llama model to generate the response
                 response = client.chat.completions.create(
                     model="meta/llama-3.2-90b-vision-instruct",
                     messages=[
@@ -68,59 +93,54 @@ if st.button("Generate Personalized Page"):
                             "role": "user",
                             "content": [
                                 {"type": "text", "text": prompt_text},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                                }
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                             ]
                         }
                     ],
-                    max_tokens=1024,
-                    temperature=0.2 
+                    max_tokens=1024, temperature=0.1 
                 )
                 
-                # 5. Robust JSON Extraction
+                # --- 4. PARSE AI JSON ---
                 raw_response = response.choices[0].message.content
                 json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                 
                 if json_match:
-                    raw_json = json_match.group(0)
-                    result_dict = json.loads(raw_json)
+                    result_dict = json.loads(json_match.group(0))
                     
-                    st.success("Analysis Complete! DOM mutations successfully generated.")
+                    st.success("Analysis Complete! DOM mutations successfully generated and applied.")
                     st.divider()
                     
-                    # --- SECTION 1: ORIGINAL WEBPAGE ---
-                    st.subheader("1. Original Landing Page")
-                    st.markdown("""
-                    <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 20px; background-color: #f8f9fa;">
-                        <h2 style="margin-top: 0; color: #333;">Sign up for our software today.</h2>
-                        <p style="color: #666;">The best platform for teams.</p>
-                        <button style="background-color: #333; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">Get Started</button>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # --- 5. RENDER REAL ORIGINAL PAGE ---
+                    st.subheader("1. Original Landing Page (Live)")
+                    original_html_str = str(live_soup)
+                    components.html(original_html_str, height=400, scrolling=True)
                     
-                    # --- SECTION 2: EDITED WEBPAGE ---
-                    st.subheader("2. Edited Landing Page (Ad-Matched)")
-                    st.write("Visual representation of the injected changes:")
-                    st.markdown("""
-                    <div style="border: 2px solid #4CAF50; padding: 20px; border-radius: 8px; margin-bottom: 20px; background-color: #f9fff9;">
-                        <h2 style="margin-top: 0; color: #2e7d32;">Automate Your Workflow in Minutes.</h2>
-                        <p style="color: #444;">Join 10,000+ teams saving 5 hours a week.</p>
-                        <button style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Start Your Free Trial</button>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # --- 6. APPLY MUTATIONS TO CODE ---
+                    edited_soup = BeautifulSoup(original_html_str, 'html.parser')
+                    for mutation in result_dict.get("mutations", []):
+                        selector = mutation.get("selector", "")
+                        new_text = mutation.get("new_text", "")
+                        # Try to find the element and swap the text
+                        try:
+                            elements = edited_soup.select(selector)
+                            if elements:
+                                elements[0].string = new_text # Change the first match
+                        except:
+                            pass # Skip if selector is invalid
+                            
+                    # --- 7. RENDER REAL EDITED PAGE ---
+                    st.subheader("2. Edited Landing Page (Mutated in Real-Time)")
+                    st.write("Notice how the UI and CSS remained intact, but the text was dynamically updated:")
+                    components.html(str(edited_soup), height=400, scrolling=True)
 
                     st.divider()
                     
-                    # --- SECTION 3: JSON FILE ---
+                    # --- 8. JSON OUTPUT ---
                     st.subheader("3. Backend Output: JSON Mutation File")
-                    st.write("This dynamic JSON payload is passed to the frontend to execute the text swaps securely without breaking the UI.")
                     st.json(result_dict)
                     
                 else:
-                    st.error("The AI failed to format the output as JSON. Here is its raw response:")
-                    st.write(raw_response)
+                    st.error("The AI failed to format the output as JSON.")
                 
             except Exception as e:
                 st.error(f"API Error: {e}")
