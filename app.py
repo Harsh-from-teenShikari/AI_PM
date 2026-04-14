@@ -39,7 +39,7 @@ def fetch_real_html(url):
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Inject a <base> tag so images and CSS styles still load correctly
+       
         if not soup.find('base'):
             base = soup.new_tag('base', href=url)
             soup.head.insert(0, base)
@@ -54,21 +54,21 @@ if st.button("Generate Personalized Page"):
     elif ad_upload and landing_url:
         with st.spinner("Fetching live website and analyzing ad creative..."):
             
-            # --- 1. FETCH LIVE WEBSITE ---
+            # FETCH WEBSITE
             live_soup = fetch_real_html(landing_url)
             if not live_soup:
                 st.error("Could not fetch the live URL. Some websites block scrapers. Try a simpler site like 'https://example.com'")
                 st.stop()
                 
-            # Extract the actual text from the site to feed to the AI
+            # Extract the actual text
             page_text = live_soup.get_text(separator=' ', strip=True)[:1500] 
             
             try:
-                # --- 2. CONNECT TO AI ---
+                # 2. CONNECT TO AI 
                 client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=api_key)
                 base64_image = encode_image_to_base64(ad_upload)
                 
-                # --- 3. PROMPT THE AI WITH REAL DATA ---
+                # 3. PROMPT THE AI WITH REAL DATA
                 prompt_text = f"""
                 You are a Conversion Rate Optimization (CRO) expert. 
                 Ad target URL: {landing_url}
@@ -100,7 +100,7 @@ if st.button("Generate Personalized Page"):
                     max_tokens=1024, temperature=0.1 
                 )
                 
-                # --- 4. PARSE AI JSON ---
+                # 4. PARSE AI JSON
                 raw_response = response.choices[0].message.content
                 json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                 
@@ -110,12 +110,12 @@ if st.button("Generate Personalized Page"):
                     st.success("Analysis Complete! DOM mutations successfully generated and applied.")
                     st.divider()
                     
-                    # --- 5. RENDER REAL ORIGINAL PAGE ---
+                    # 5. RENDER REAL PAGE 
                     st.subheader("1. Original Landing Page (Live)")
                     original_html_str = str(live_soup)
                     components.html(original_html_str, height=400, scrolling=True)
                     
-                    # --- 6. APPLY MUTATIONS TO CODE ---
+                    # 6. APPLY MUTATIONS 
                     edited_soup = BeautifulSoup(original_html_str, 'html.parser')
                     for mutation in result_dict.get("mutations", []):
                         selector = mutation.get("selector", "")
@@ -124,18 +124,18 @@ if st.button("Generate Personalized Page"):
                         try:
                             elements = edited_soup.select(selector)
                             if elements:
-                                elements[0].string = new_text # Change the first match
+                                elements[0].string = new_text 
                         except:
-                            pass # Skip if selector is invalid
+                            pass 
                             
-                    # --- 7. RENDER REAL EDITED PAGE ---
+                    #  7. RENDER EDITED PAGE 
                     st.subheader("2. Edited Landing Page (Mutated in Real-Time)")
                     st.write("Notice how the UI and CSS remained intact, but the text was dynamically updated:")
                     components.html(str(edited_soup), height=400, scrolling=True)
 
                     st.divider()
                     
-                    # --- 8. JSON OUTPUT ---
+                    # 8. JSON OUTPUT
                     st.subheader("3. Backend Output: JSON Mutation File")
                     st.json(result_dict)
                     
